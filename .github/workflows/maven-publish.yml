@@ -33,12 +33,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      # 4. Increment patch version
       - name: Increment patch version
         run: |
-          mvn build-helper:parse-version versions:set \
-            -DnewVersion="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.$((parsedVersion.incrementalVersion+1))" \
-            versions:commit
+          # Parse current version
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Split into major.minor.patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          
+          # Increment patch
+          PATCH=$((PATCH+1))
+          
+          # New version
+          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          echo "New version: $NEW_VERSION"
+          
+          # Set new version in pom.xml
+          mvn versions:set -DnewVersion=$NEW_VERSION -DgenerateBackupPoms=false
 
       # 5. Get new version
       - name: Get new version
