@@ -7,7 +7,6 @@ on:
   release:
     types: [created]
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -33,34 +32,31 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
+      # 4. Increment patch version
       - name: Increment patch version
         run: |
-          # Parse current version
           CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Current version: $CURRENT_VERSION"
-          
-          # Split into major.minor.patch
+
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          
-          # Increment patch
           PATCH=$((PATCH+1))
-          
-          # New version
           NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           echo "New version: $NEW_VERSION"
-          
-          # Set new version in pom.xml
+
+          # Update pom.xml
           mvn versions:set -DnewVersion=$NEW_VERSION -DgenerateBackupPoms=false
 
-      # 5. Get new version
-      - name: Get new version
-        id: get_version
+          # Commit updated pom.xml so it's saved in the branch
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add pom.xml
+          git commit -m "Increment patch version to $NEW_VERSION" || echo "No changes to commit"
+          git push origin HEAD:main || echo "Push failed, maybe no permission"
+
+      # 5. Set VERSION env variable
+      - name: Set version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          if [ -z "$VERSION" ]; then
-            echo "Failed to get version"
-            exit 1
-          fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "New version: $VERSION"
 
@@ -86,4 +82,3 @@ jobs:
       # 10. Push Docker image
       - name: Push Docker image
         run: docker push byakuka/simple-java-app:"$VERSION"
-
