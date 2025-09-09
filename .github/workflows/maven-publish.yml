@@ -24,37 +24,54 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # 3. Increment patch version
+      # 3. Cache Maven packages
+      - name: Cache Maven packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # 4. Increment patch version
       - name: Increment patch version
         run: |
           mvn build-helper:parse-version versions:set \
-            -DnewVersion="\${parsedVersion.majorVersion}.\${parsedVersion.minorVersion}.\$((\${parsedVersion.incrementalVersion}+1))" \
+            -DnewVersion="${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.$((parsedVersion.incrementalVersion+1))" \
             versions:commit
 
-      # 4. Get new version
+      # 5. Get new version
       - name: Get new version
         id: get_version
         run: |
           VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          if [ -z "$VERSION" ]; then
+            echo "Failed to get version"
+            exit 1
+          fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "New version: $VERSION"
 
-      # 5. Build Maven package
+      # 6. Build Maven package
       - name: Build with Maven
         run: mvn -B package --file pom.xml
 
-      # 6. Build Docker image
-      - name: Build Docker image
-        run: docker build -t byakuka/simple-java-app:$VERSION .
+      # 7. Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # 7. Login to Docker Hub
+      # 8. Login to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 8. Push Docker image
+      # 9. Build Docker image
+      - name: Build Docker image
+        run: docker build -t byakuka/simple-java-app:"$VERSION" .
+
+      # 10. Push Docker image
       - name: Push Docker image
-        run: docker push byakuka/simple-java-app:$VERSION
+        run: docker push byakuka/simple-java-app:"$VERSION"
 
