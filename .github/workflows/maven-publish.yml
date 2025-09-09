@@ -14,11 +14,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Get current version from pom.xml
+      # 2. Get current version from Maven
       - name: Get current version
         id: get_version
         run: |
-          VERSION=$(xmllint --xpath "string(//*[local-name()='project']/*[local-name()='version'])" pom.xml)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "Current version: $VERSION"
 
@@ -27,12 +27,12 @@ jobs:
         id: increment_version
         uses: yoichiro/gh-action-increment-value@main
         with:
-          value: ${{ env.VERSION }}      # Current version
-          pattern: '(\d+)\.(\d+)\.(\d+)'  # Regex to match semantic version
-          group: 3                       # Increment the patch (3rd number)
-          format: '$1.$2.$((\3+1))'     # Increment patch
-          
-      # 4. Update pom.xml with new version
+          value: ${{ env.VERSION }}
+          pattern: '(\d+)\.(\d+)\.(\d+)'  # Match semantic version
+          group: 3                       # Increment patch (3rd number)
+          format: '$1.$2.$((\3+1))'
+
+      # 4. Update pom.xml with new version using Maven
       - name: Set new version in pom.xml
         run: |
           NEW_VERSION=${{ steps.increment_version.outputs.value }}
@@ -48,7 +48,7 @@ jobs:
       - name: Build Docker image
         run: docker build -t christina-draeger/simple-java-app:${{ steps.increment_version.outputs.value }} .
 
-      # 7. Login to Docker Hub
+      # 7. Login to Docker Hub using secrets
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
