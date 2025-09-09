@@ -1,48 +1,61 @@
 name: Build and Push Docker
 
 on:
+  workflow_dispatch:   # manual trigger for testing
   push:
     branches: [main]
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # 1. Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
+      # 2. Get current version from pom.xml
       - name: Get current version
         id: get_version
         run: |
           VERSION=$(xmllint --xpath "string(//*[local-name()='project']/*[local-name()='version'])" pom.xml)
-          echo "version=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Current version: $VERSION"
 
-      - name: Increment version
+      # 3. Increment patch version
+      - name: Increment patch version
         id: increment_version
-        uses: christian-draeger/increment-semantic-version@v1.2.3
+        uses: yoichiro/gh-action-increment-value@main
         with:
-          current-version: ${{ steps.get_version.outputs.version }}
-          version-fragment: patch
-
+          value: ${{ env.VERSION }}      # Current version
+          pattern: '(\d+)\.(\d+)\.(\d+)'  # Regex to match semantic version
+          group: 3                       # Increment the patch (3rd number)
+          format: '$1.$2.$((\3+1))'     # Increment patch
+          
+      # 4. Update pom.xml with new version
       - name: Set new version in pom.xml
         run: |
-          mvn versions:set -DnewVersion=${{ steps.increment_version.outputs.next-version }}
+          NEW_VERSION=${{ steps.increment_version.outputs.value }}
+          echo "New version: $NEW_VERSION"
+          mvn versions:set -DnewVersion=$NEW_VERSION
           mvn versions:commit
 
+      # 5. Build Maven package
       - name: Build with Maven
         run: mvn -B package --file pom.xml
 
+      # 6. Build Docker image
       - name: Build Docker image
-        run: docker build -t christina-draeger/simple-java-app:${{ steps.increment_version.outputs.next-version }} .
+        run: docker build -t christina-draeger/simple-java-app:${{ steps.increment_version.outputs.value }} .
 
+      # 7. Login to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # 8. Push Docker image
       - name: Push Docker image
-        run: docker push christina-draeger/simple-java-app:${{ steps.increment_version.outputs.next-version }}
+        run: docker push christina-draeger/simple-java-app:${{ steps.increment_version.outputs.value }}
 
