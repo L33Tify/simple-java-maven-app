@@ -1,26 +1,13 @@
-# Stage 1: Build with Maven + Java 21
+# Stage 1: Build
 FROM maven:3.9.9-eclipse-temurin-21 AS build
-
 WORKDIR /app
-
-# Copy pom.xml first to cache dependencies
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# Copy source code
 COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Build the app (skip tests for faster builds)
-RUN mvn package -DskipTests
-
-# Stage 2: Runtime using Java 21
-FROM eclipse-temurin:21-jre
-
+# Stage 2: Run
+FROM eclipse-temurin:21-jdk
 WORKDIR /app
-
-# Copy the built jar from previous stage
-COPY --from=build /app/target/*.jar app.jar
-
-# Run the app
-ENTRYPOINT ["java","-jar","app.jar"]
-
+COPY --from=build /app/target/simple-java-maven-app-*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
