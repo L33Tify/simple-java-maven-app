@@ -21,7 +21,7 @@ jobs:
 
       - name: Increment version
         id: increment_version
-        uses: christian-draeger/increment-semantic-version@v1
+        uses: christian-draeger/increment-semantic-version@v1.2.3
         with:
           current-version: ${{ steps.get_version.outputs.version }}
           version-fragment: patch
