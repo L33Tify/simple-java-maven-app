@@ -24,13 +24,10 @@ jobs:
 
       # 3. Increment patch version
       - name: Increment patch version
-        id: increment_version
-        uses: yoichiro/gh-action-increment-value@main
-        with:
-          value: ${{ env.VERSION }}
-          pattern: '(\d+)\.(\d+)\.(\d+)'  # Match semantic version
-          group: 3                       # Increment patch (3rd number)
-          format: '$1.$2.$((\3+1))'
+        run: |
+    mvn build-helper:parse-version versions:set \
+        -DnewVersion="\${parsedVersion.majorVersion}.\${parsedVersion.minorVersion}.\$((\${parsedVersion.incrementalVersion}+1))" \
+        versions:commit
 
       # 4. Update pom.xml with new version using Maven
       - name: Set new version in pom.xml
