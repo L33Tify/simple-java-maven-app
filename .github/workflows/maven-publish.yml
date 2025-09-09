@@ -32,16 +32,27 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-maven-
 
-      - name: Get project version
-        id: get_version
+      - name: Increment Patch
+        id: bump_version
         run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          if [ -z "$VERSION" ]; then
-            echo "Failed to get version"
-            exit 1
-          fi
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          CURRENT_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          BASE_VERSION=$(echo $CURRENT_VERSION | sed 's/-SNAPSHOT//')
+          MAJOR=$(echo $BASE_VERSION | cut -d. -f1)
+          MINOR=$(echo $BASE_VERSION | cut -d. -f2)
+          PATCH=$(echo $BASE_VERSION | cut -d. -f3)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$NEW_PATCH"
+          mvn versions:set -DnewVersion=$NEW_VERSION
+          echo "VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Commit and push new version
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git add pom.xml
+          git commit -m "ci: bump version to ${{ env.VERSION }}" || echo "No changes to commit"
+          git push || echo "No changes to push"
 
       - name: Build with Maven
         run: mvn -B package --file pom.xml
